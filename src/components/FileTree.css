@@ -1,0 +1,80 @@
+.file-tree-node {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.file-tree-item:hover {
+  background-color: #f0f0f0;
+}
+
+.file-tree-item.directory {
+  font-weight: 500;
+}
+
+.file-tree-item.file {
+  color: #666;
+}
+
+.file-icon {
+  margin-right: 8px;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #999;
+  margin-left: 8px;
+}
+
+.file-tree-children {
+  border-left: 1px solid #e0e0e0;
+  margin-left: 10px;
+}
+
+/* 选中状态 */
+.file-tree-item.selected {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+/* 滚动条样式 */
+.file-tree-container {
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+.file-tree-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-tree-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.file-tree-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.file-tree-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

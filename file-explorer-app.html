@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyNoteExplorer - 完整版</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .path-form {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            max-width: 600px;
+            margin-left: 32px;
+        }
+
+        .path-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .browse-btn {
+            padding: 10px 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .browse-btn:hover {
+            background-color: #219a52;
+            transform: translateY(-1px);
+        }
+
+        .browse-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            margin-bottom: 16px;
+            font-size: 16px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-path {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-path:hover {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+            transform: translateX(4px);
+        }
+
+        .file-tree-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: white;
+            margin: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .file-tree-node {
+            font-size: 14px;
+        }
+
+        .file-tree-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            user-select: none;
+            margin: 2px 0;
+        }
+
+        .file-tree-item:hover {
+            background-color: #f0f8ff;
+            transform: translateX(2px);
+        }
+
+        .file-tree-item.directory {
+            font-weight: 500;
+        }
+
+        .file-tree-item.file {
+            color: #666;
+        }
+
+        .file-tree-item.info {
+            color: #999;
+            font-style: italic;
+            cursor: default;
+        }
+
+        .file-tree-item.info:hover {
+            background-color: transparent;
+            transform: none;
+        }
+
+        .file-icon {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: #999;
+            margin-left: 8px;
+        }
+
+        .file-children {
+            margin-left: 24px;
+            border-left: 2px solid #e8f4fd;
+            padding-left: 12px;
+            margin-top: 4px;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 18px;
+            color: #666;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ffcdd2;
+            margin: 16px;
+        }
+
+        .error h3 {
+            margin-bottom: 8px;
+        }
+
+        .success-message {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid #c8e6c9;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .breadcrumb {
+            background-color: #f8f9fa;
+            padding: 12px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .breadcrumb-item {
+            color: #3498db;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .breadcrumb-item:hover {
+            text-decoration: underline;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .path-form {
+                margin-left: 0;
+                max-width: none;
+            }
+            
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: auto;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>📁 MyNoteExplorer</h1>
+        <div class="path-form">
+            <input type="text" class="path-input" id="pathInput" placeholder="输入文件夹路径..." value="C:\Users">
+            <button class="browse-btn" id="browseBtn" onclick="browseDirectory()">浏览</button>
+        </div>
+    </header>
+
+    <div class="breadcrumb" id="breadcrumb" style="display: none;">
+        <span>当前位置: </span>
+        <span id="currentPath"></span>
+    </div>
+
+    <div class="main-content">
+        <aside class="sidebar">
+            <h3>🚀 快速访问</h3>
+            <button class="quick-path" onclick="loadPath('C:\\Users')">
+                <span>👤</span> 用户文件夹
+            </button>
+            <button class="quick-path" onclick="loadPath('C:\\Users\\' + getUsername() + '\\Documents')">
+                <span>📄</span> 文档
+            </button>
+            <button class="quick-path" onclick="loadPath('C:\\Users\\' + getUsername() + '\\Desktop')">
+                <span>🖥️</span> 桌面
+            </button>
+            <button class="quick-path" onclick="loadPath('C:\\Users\\' + getUsername() + '\\Downloads')">
+                <span>📥</span> 下载
+            </button>
+            <button class="quick-path" onclick="loadPath('C:\\')">
+                <span>💾</span> C盘根目录
+            </button>
+            <button class="quick-path" onclick="loadPath('D:\\')">
+                <span>💿</span> D盘根目录
+            </button>
+        </aside>
+
+        <main class="file-tree-container" id="fileTreeContainer">
+            <div class="success-message">
+                <span>🎉</span>
+                <div>
+                    <strong>MyNoteExplorer 已启动！</strong><br>
+                    这是完整版本，支持真实的文件系统访问。请在上方输入路径或点击左侧快速访问按钮开始浏览。
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentTreeData = null;
+
+        function getUsername() {
+            return 'freddywang'; // 可以通过API获取真实用户名
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '';
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+        }
+
+        function createFileTreeNode(node, level = 0) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'file-tree-node';
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = `file-tree-item ${node.type}`;
+            itemDiv.style.paddingLeft = `${level * 20}px`;
+
+            const icon = document.createElement('span');
+            icon.className = 'file-icon';
+            icon.textContent = node.icon;
+
+            const name = document.createElement('span');
+            name.className = 'file-name';
+            name.textContent = node.name;
+            name.title = node.path; // 显示完整路径作为提示
+
+            itemDiv.appendChild(icon);
+            itemDiv.appendChild(name);
+
+            if (node.type === 'file' && node.size) {
+                const size = document.createElement('span');
+                size.className = 'file-size';
+                size.textContent = formatFileSize(node.size);
+                itemDiv.appendChild(size);
+            }
+
+            nodeDiv.appendChild(itemDiv);
+
+            if (node.type === 'directory' && node.children) {
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'file-children';
+                childrenDiv.style.display = level < 2 ? 'block' : 'none'; // 默认展开前两层
+
+                node.children.forEach(child => {
+                    childrenDiv.appendChild(createFileTreeNode(child, level + 1));
+                });
+
+                nodeDiv.appendChild(childrenDiv);
+
+                // 添加点击事件
+                itemDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isExpanded = childrenDiv.style.display === 'block';
+                    childrenDiv.style.display = isExpanded ? 'none' : 'block';
+                    icon.textContent = isExpanded ? '📁' : '📂';
+                });
+
+                // 设置初始图标
+                if (level < 2) {
+                    icon.textContent = '📂';
+                }
+            } else if (node.type === 'file') {
+                itemDiv.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const response = await fetch('/api/open', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ filePath: node.path })
+                        });
+                        
+                        if (response.ok) {
+                            console.log(`文件已打开: ${node.path}`);
+                            // 可以添加成功提示
+                        } else {
+                            console.error('打开文件失败');
+                        }
+                    } catch (error) {
+                        console.error('打开文件时出错:', error);
+                    }
+                });
+            }
+
+            return nodeDiv;
+        }
+
+        async function loadPath(path) {
+            const container = document.getElementById('fileTreeContainer');
+            const browseBtn = document.getElementById('browseBtn');
+            const pathInput = document.getElementById('pathInput');
+            const breadcrumb = document.getElementById('breadcrumb');
+            const currentPathSpan = document.getElementById('currentPath');
+            
+            // 更新输入框
+            pathInput.value = path;
+            
+            // 显示加载状态
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>正在加载 ${path}...</div>
+                </div>
+            `;
+            
+            browseBtn.disabled = true;
+            browseBtn.textContent = '加载中...';
+
+            try {
+                const response = await fetch(`/api/directory?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentTreeData = data;
+                    container.innerHTML = '';
+                    container.appendChild(createFileTreeNode(data));
+                    
+                    // 显示面包屑导航
+                    breadcrumb.style.display = 'block';
+                    currentPathSpan.textContent = path;
+                } else {
+                    container.innerHTML = `
+                        <div class="error">
+                            <h3>⚠️ 加载失败</h3>
+                            <p>${data.error}</p>
+                            <p><strong>建议：</strong></p>
+                            <ul style="margin: 10px 0 0 20px;">
+                                <li>检查路径是否存在</li>
+                                <li>确保有访问权限</li>
+                                <li>尝试其他路径</li>
+                            </ul>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        <h3>❌ 网络错误</h3>
+                        <p>无法连接到服务器: ${error.message}</p>
+                        <p>请确保服务器正在运行。</p>
+                    </div>
+                `;
+            } finally {
+                browseBtn.disabled = false;
+                browseBtn.textContent = '浏览';
+            }
+        }
+
+        function browseDirectory() {
+            const path = document.getElementById('pathInput').value.trim();
+            if (path) {
+                loadPath(path);
+            }
+        }
+
+        // 回车键支持
+        document.getElementById('pathInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                browseDirectory();
+            }
+        });
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('MyNoteExplorer 完整版已加载');
+            
+            // 可以自动加载默认路径
+            // loadPath('C:\\Users');
+        });
+    </script>
+</body>
+</html>

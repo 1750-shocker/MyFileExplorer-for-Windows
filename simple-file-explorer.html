@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyNoteExplorer - 简化版</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .path-input {
+            flex: 1;
+            max-width: 500px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .browse-btn {
+            padding: 8px 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .browse-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 200px;
+            background-color: #f8f9fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 16px;
+        }
+
+        .sidebar h3 {
+            margin-bottom: 16px;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .quick-path {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            text-decoration: none;
+            color: #333;
+        }
+
+        .quick-path:hover {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .file-tree-container {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            background-color: white;
+            margin: 16px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .file-tree-node {
+            font-size: 14px;
+        }
+
+        .file-tree-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+
+        .file-tree-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .file-tree-item.directory {
+            font-weight: 500;
+        }
+
+        .file-tree-item.file {
+            color: #666;
+        }
+
+        .file-icon {
+            margin-right: 8px;
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-children {
+            margin-left: 20px;
+            border-left: 1px solid #e0e0e0;
+            padding-left: 10px;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 18px;
+            color: #666;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 16px;
+            border-radius: 4px;
+            border: 1px solid #ffcdd2;
+            margin: 16px;
+        }
+
+        .demo-note {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            padding: 16px;
+            border-radius: 4px;
+            border: 1px solid #bbdefb;
+            margin: 16px;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>📁 MyNoteExplorer</h1>
+        <input type="text" class="path-input" id="pathInput" placeholder="输入文件夹路径..." value="C:\Users">
+        <button class="browse-btn" onclick="browseDirectory()">浏览</button>
+    </header>
+
+    <div class="main-content">
+        <aside class="sidebar">
+            <h3>快速访问</h3>
+            <button class="quick-path" onclick="loadDemoData()">📁 演示数据</button>
+            <button class="quick-path" onclick="loadPath('C:\\Users')">👤 用户文件夹</button>
+            <button class="quick-path" onclick="loadPath('C:\\Users\\' + getUsername() + '\\Documents')">📄 文档</button>
+            <button class="quick-path" onclick="loadPath('C:\\Users\\' + getUsername() + '\\Desktop')">🖥️ 桌面</button>
+        </aside>
+
+        <main class="file-tree-container" id="fileTreeContainer">
+            <div class="demo-note">
+                <h3>🚀 MyNoteExplorer 原型演示</h3>
+                <p>这是一个文件浏览器的原型版本，展示了核心的树形结构功能：</p>
+                <ul style="margin: 10px 0 10px 20px;">
+                    <li>📂 点击文件夹可展开/折叠</li>
+                    <li>📄 不同文件类型显示不同图标</li>
+                    <li>🔍 清晰的层级结构展示</li>
+                    <li>⚡ 快速访问常用文件夹</li>
+                </ul>
+                <p><strong>点击左侧的"演示数据"按钮查看效果！</strong></p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 模拟文件系统数据
+        const demoFileSystem = {
+            name: "我的笔记",
+            path: "C:\\Users\\MyNotes",
+            type: "directory",
+            children: [
+                {
+                    name: "工作笔记",
+                    path: "C:\\Users\\MyNotes\\工作笔记",
+                    type: "directory",
+                    children: [
+                        {
+                            name: "项目计划.md",
+                            path: "C:\\Users\\MyNotes\\工作笔记\\项目计划.md",
+                            type: "file",
+                            size: 2048
+                        },
+                        {
+                            name: "会议记录.txt",
+                            path: "C:\\Users\\MyNotes\\工作笔记\\会议记录.txt",
+                            type: "file",
+                            size: 1024
+                        },
+                        {
+                            name: "技术文档",
+                            path: "C:\\Users\\MyNotes\\工作笔记\\技术文档",
+                            type: "directory",
+                            children: [
+                                {
+                                    name: "API文档.md",
+                                    path: "C:\\Users\\MyNotes\\工作笔记\\技术文档\\API文档.md",
+                                    type: "file",
+                                    size: 4096
+                                },
+                                {
+                                    name: "数据库设计.sql",
+                                    path: "C:\\Users\\MyNotes\\工作笔记\\技术文档\\数据库设计.sql",
+                                    type: "file",
+                                    size: 3072
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "学习笔记",
+                    path: "C:\\Users\\MyNotes\\学习笔记",
+                    type: "directory",
+                    children: [
+                        {
+                            name: "JavaScript高级.md",
+                            path: "C:\\Users\\MyNotes\\学习笔记\\JavaScript高级.md",
+                            type: "file",
+                            size: 8192
+                        },
+                        {
+                            name: "React开发指南.md",
+                            path: "C:\\Users\\MyNotes\\学习笔记\\React开发指南.md",
+                            type: "file",
+                            size: 6144
+                        },
+                        {
+                            name: "算法练习",
+                            path: "C:\\Users\\MyNotes\\学习笔记\\算法练习",
+                            type: "directory",
+                            children: [
+                                {
+                                    name: "排序算法.js",
+                                    path: "C:\\Users\\MyNotes\\学习笔记\\算法练习\\排序算法.js",
+                                    type: "file",
+                                    size: 2560
+                                },
+                                {
+                                    name: "二叉树.py",
+                                    path: "C:\\Users\\MyNotes\\学习笔记\\算法练习\\二叉树.py",
+                                    type: "file",
+                                    size: 1536
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "个人日记",
+                    path: "C:\\Users\\MyNotes\\个人日记",
+                    type: "directory",
+                    children: [
+                        {
+                            name: "2024年总结.md",
+                            path: "C:\\Users\\MyNotes\\个人日记\\2024年总结.md",
+                            type: "file",
+                            size: 5120
+                        },
+                        {
+                            name: "读书笔记.txt",
+                            path: "C:\\Users\\MyNotes\\个人日记\\读书笔记.txt",
+                            type: "file",
+                            size: 3584
+                        }
+                    ]
+                },
+                {
+                    name: "配置文件",
+                    path: "C:\\Users\\MyNotes\\配置文件",
+                    type: "directory",
+                    children: [
+                        {
+                            name: "settings.json",
+                            path: "C:\\Users\\MyNotes\\配置文件\\settings.json",
+                            type: "file",
+                            size: 512
+                        },
+                        {
+                            name: "config.yaml",
+                            path: "C:\\Users\\MyNotes\\配置文件\\config.yaml",
+                            type: "file",
+                            size: 768
+                        }
+                    ]
+                }
+            ]
+        };
+
+        function getUsername() {
+            return "freddywang"; // 模拟用户名
+        }
+
+        function getFileIcon(node) {
+            if (node.type === 'directory') {
+                return '📁';
+            }
+            
+            const ext = node.name.split('.').pop()?.toLowerCase();
+            switch (ext) {
+                case 'md': return '📝';
+                case 'txt': return '📄';
+                case 'json': return '⚙️';
+                case 'js': case 'ts': return '📜';
+                case 'html': return '🌐';
+                case 'css': return '🎨';
+                case 'py': return '🐍';
+                case 'sql': return '🗃️';
+                case 'yaml': case 'yml': return '📋';
+                case 'png': case 'jpg': case 'jpeg': case 'gif': return '🖼️';
+                default: return '📄';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '';
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+        }
+
+        function createFileTreeNode(node, level = 0) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'file-tree-node';
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = `file-tree-item ${node.type}`;
+            itemDiv.style.paddingLeft = `${level * 20}px`;
+
+            const icon = document.createElement('span');
+            icon.className = 'file-icon';
+            icon.textContent = getFileIcon(node);
+
+            const name = document.createElement('span');
+            name.className = 'file-name';
+            name.textContent = node.name;
+
+            itemDiv.appendChild(icon);
+            itemDiv.appendChild(name);
+
+            if (node.type === 'file' && node.size) {
+                const size = document.createElement('span');
+                size.className = 'file-size';
+                size.style.fontSize = '12px';
+                size.style.color = '#999';
+                size.style.marginLeft = '8px';
+                size.textContent = formatFileSize(node.size);
+                itemDiv.appendChild(size);
+            }
+
+            nodeDiv.appendChild(itemDiv);
+
+            if (node.type === 'directory' && node.children) {
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'file-children';
+                childrenDiv.style.display = level < 2 ? 'block' : 'none'; // 默认展开前两层
+
+                node.children.forEach(child => {
+                    childrenDiv.appendChild(createFileTreeNode(child, level + 1));
+                });
+
+                nodeDiv.appendChild(childrenDiv);
+
+                // 添加点击事件
+                itemDiv.addEventListener('click', () => {
+                    const isExpanded = childrenDiv.style.display === 'block';
+                    childrenDiv.style.display = isExpanded ? 'none' : 'block';
+                    icon.textContent = isExpanded ? '📁' : '📂';
+                });
+
+                // 设置初始图标
+                if (level < 2) {
+                    icon.textContent = '📂';
+                }
+            } else if (node.type === 'file') {
+                itemDiv.addEventListener('click', () => {
+                    alert(`打开文件: ${node.path}\n\n在实际应用中，这里会用系统默认程序打开文件。`);
+                });
+            }
+
+            return nodeDiv;
+        }
+
+        function loadDemoData() {
+            const container = document.getElementById('fileTreeContainer');
+            container.innerHTML = '';
+            container.appendChild(createFileTreeNode(demoFileSystem));
+        }
+
+        function loadPath(path) {
+            const container = document.getElementById('fileTreeContainer');
+            container.innerHTML = `
+                <div class="error">
+                    <h3>⚠️ 功能限制</h3>
+                    <p>这是原型版本，暂时无法访问真实的文件系统。</p>
+                    <p>请点击"演示数据"查看文件树功能演示。</p>
+                    <p><strong>完整版本将支持：</strong></p>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li>真实文件系统访问</li>
+                        <li>文件搜索功能</li>
+                        <li>文件预览</li>
+                        <li>右键菜单</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        function browseDirectory() {
+            const path = document.getElementById('pathInput').value;
+            loadPath(path);
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('MyNoteExplorer 原型版本已加载');
+        });
+    </script>
+</body>
+</html>
