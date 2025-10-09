@@ -12,7 +12,8 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true
-    }
+    },
+    icon:path.join(__dirname, '../build/icon.ico')
   });
 
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;

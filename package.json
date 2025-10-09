@@ -57,7 +57,8 @@
       "node_modules/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/favicon.ico"
     },
     "nsis": {
       "oneClick": false,
