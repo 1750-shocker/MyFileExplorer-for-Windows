@@ -11,5 +11,6 @@ export interface FileTreeProps {
   node: FileNode;
   onFileClick: (filePath: string) => void;
   onDirectoryClick: (dirPath: string) => void;
+  onRightClick?: (e: React.MouseEvent, node: FileNode) => void;
   level?: number;
 }

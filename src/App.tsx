@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [showContextMenu, setShowContextMenu] = useState<boolean>(false);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [contextMenuTarget, setContextMenuTarget] = useState<string | null>(null);
+  const [contextMenuNode, setContextMenuNode] = useState<FileNode | null>(null);
 
   // 初始化时加载用户主目录
   useEffect(() => {
@@ -58,17 +59,34 @@ const App: React.FC = () => {
     setShowContextMenu(true);
   };
 
-  const handleContextMenuAction = (action: string) => {
+  const handleFileTreeRightClick = (e: React.MouseEvent, node: FileNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    setContextMenuNode(node);
+    setContextMenuTarget(null); // 清除收藏夹的右键菜单目标
+    setShowContextMenu(true);
+  };
+
+  const handleContextMenuAction = async (action: string) => {
     if (action === 'delete' && contextMenuTarget) {
       removeFromFavorites(contextMenuTarget);
+    } else if (action === 'openInExplorer' && contextMenuNode) {
+      const success = await fileSystemService.openInExplorer(contextMenuNode.path);
+      if (!success) {
+        console.error('Failed to open in explorer');
+      }
     }
     setShowContextMenu(false);
     setContextMenuTarget(null);
+    setContextMenuNode(null);
   };
 
   useEffect(() => {
     const handleClickOutside = () => {
       setShowContextMenu(false);
+      setContextMenuTarget(null);
+      setContextMenuNode(null);
     };
     
     if (showContextMenu) {
@@ -179,6 +197,7 @@ const App: React.FC = () => {
                 node={currentTree}
                 onFileClick={handleFileClick}
                 onDirectoryClick={handleDirectoryClick}
+                onRightClick={handleFileTreeRightClick}
               />
             </div>
           )}
@@ -196,12 +215,22 @@ const App: React.FC = () => {
             zIndex: 1000
           }}
         >
-          <div
-            className="context-menu-item"
-            onClick={() => handleContextMenuAction('delete')}
-          >
-            🗑️ 删除收藏
-          </div>
+          {contextMenuTarget && (
+            <div
+              className="context-menu-item"
+              onClick={() => handleContextMenuAction('delete')}
+            >
+              🗑️ 删除收藏
+            </div>
+          )}
+          {contextMenuNode && (
+            <div
+              className="context-menu-item"
+              onClick={() => handleContextMenuAction('openInExplorer')}
+            >
+              📂 在文件浏览器中打开
+            </div>
+          )}
         </div>
       )}
     </div>

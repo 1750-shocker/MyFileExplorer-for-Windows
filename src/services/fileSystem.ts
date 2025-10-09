@@ -46,6 +46,22 @@ class FileSystemService {
     }
   }
 
+  // 在系统文件浏览器中打开文件或文件夹
+  async openInExplorer(pathToOpen: string): Promise<boolean> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return false;
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('open-in-explorer', pathToOpen);
+      return result;
+    } catch (error) {
+      console.error('Error opening in explorer:', error);
+      return false;
+    }
+  }
+
   // 获取常用目录路径
   getCommonPaths(): string[] {
     const os = window.require?.('os');

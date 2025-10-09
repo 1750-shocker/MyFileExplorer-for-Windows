@@ -60,6 +60,18 @@ ipcMain.handle('open-file', async (event, filePath) => {
   }
 });
 
+ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
+  try {
+    const { shell } = require('electron');
+    // 在Windows上，使用shell.showItemInFolder来在文件浏览器中显示文件/文件夹
+    shell.showItemInFolder(pathToOpen);
+    return true;
+  } catch (error) {
+    console.error('Error opening in explorer:', error);
+    return false;
+  }
+});
+
 async function getDirectoryTree(dirPath) {
   const stats = await fs.promises.stat(dirPath);
   const name = path.basename(dirPath);

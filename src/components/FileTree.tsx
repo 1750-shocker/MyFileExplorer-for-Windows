@@ -6,6 +6,7 @@ const FileTree: React.FC<FileTreeProps> = ({
   node, 
   onFileClick, 
   onDirectoryClick, 
+  onRightClick,
   level = 0 
 }) => {
   const [isExpanded, setIsExpanded] = useState(level < 2); // 默认展开前两层
@@ -16,6 +17,12 @@ const FileTree: React.FC<FileTreeProps> = ({
       onDirectoryClick(node.path);
     } else {
       onFileClick(node.path);
+    }
+  };
+
+  const handleRightClick = (e: React.MouseEvent) => {
+    if (onRightClick) {
+      onRightClick(e, node);
     }
   };
 
@@ -63,6 +70,7 @@ const FileTree: React.FC<FileTreeProps> = ({
         className={`file-tree-item ${node.type}`}
         style={{ paddingLeft: `${level * 20}px` }}
         onClick={handleClick}
+        onContextMenu={handleRightClick}
       >
         <span className="file-icon">{getIcon()}</span>
         <span className="file-name">{node.name}</span>
@@ -79,11 +87,13 @@ const FileTree: React.FC<FileTreeProps> = ({
               node={child}
               onFileClick={onFileClick}
               onDirectoryClick={onDirectoryClick}
+              onRightClick={onRightClick}
               level={level + 1}
             />
           ))}
         </div>
       )}
+
     </div>
   );
 };
