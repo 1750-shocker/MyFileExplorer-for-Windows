@@ -62,6 +62,86 @@ class FileSystemService {
     }
   }
 
+  // 获取屏蔽规则
+  async getBlockRules(): Promise<any> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return { blockedExtensions: [], blockedPaths: [] };
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('get-block-rules');
+      return result;
+    } catch (error) {
+      console.error('Error getting block rules:', error);
+      return { blockedExtensions: [], blockedPaths: [] };
+    }
+  }
+
+  // 添加屏蔽扩展名
+  async addBlockExtension(extension: string): Promise<boolean> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return false;
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('add-block-extension', extension);
+      return result;
+    } catch (error) {
+      console.error('Error adding block extension:', error);
+      return false;
+    }
+  }
+
+  // 添加屏蔽路径
+  async addBlockPath(filePath: string): Promise<boolean> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return false;
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('add-block-path', filePath);
+      return result;
+    } catch (error) {
+      console.error('Error adding block path:', error);
+      return false;
+    }
+  }
+
+  // 移除屏蔽扩展名
+  async removeBlockExtension(extension: string): Promise<boolean> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return false;
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('remove-block-extension', extension);
+      return result;
+    } catch (error) {
+      console.error('Error removing block extension:', error);
+      return false;
+    }
+  }
+
+  // 移除屏蔽路径
+  async removeBlockPath(filePath: string): Promise<boolean> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return false;
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('remove-block-path', filePath);
+      return result;
+    } catch (error) {
+      console.error('Error removing block path:', error);
+      return false;
+    }
+  }
+
   // 获取常用目录路径
   getCommonPaths(): string[] {
     const os = window.require?.('os');

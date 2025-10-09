@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 let mainWindow;
 
@@ -44,6 +45,56 @@ app.on('activate', () => {
   }
 });
 
+// 屏蔽规则存储路径
+const getBlockRulesPath = () => {
+  return path.join(os.homedir(), '.myfileexplorer-block-rules.json');
+};
+
+// 加载屏蔽规则
+const loadBlockRules = () => {
+  try {
+    const rulesPath = getBlockRulesPath();
+    if (fs.existsSync(rulesPath)) {
+      const data = fs.readFileSync(rulesPath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error loading block rules:', error);
+  }
+  return {
+    blockedExtensions: [],
+    blockedPaths: []
+  };
+};
+
+// 保存屏蔽规则
+const saveBlockRules = (rules) => {
+  try {
+    const rulesPath = getBlockRulesPath();
+    fs.writeFileSync(rulesPath, JSON.stringify(rules, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving block rules:', error);
+    return false;
+  }
+};
+
+// 检查文件是否被屏蔽
+const isBlocked = (filePath, fileName, rules) => {
+  // 检查路径是否被屏蔽
+  if (rules.blockedPaths.includes(filePath)) {
+    return true;
+  }
+  
+  // 检查文件扩展名是否被屏蔽
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext && rules.blockedExtensions.includes(ext)) {
+    return true;
+  }
+  
+  return false;
+};
+
 // IPC handlers for file system operations
 ipcMain.handle('get-directory-tree', async (event, dirPath) => {
   try {
@@ -52,6 +103,41 @@ ipcMain.handle('get-directory-tree', async (event, dirPath) => {
     console.error('Error reading directory:', error);
     return null;
   }
+});
+
+// IPC handlers for block rules
+ipcMain.handle('get-block-rules', async () => {
+  return loadBlockRules();
+});
+
+ipcMain.handle('add-block-extension', async (event, extension) => {
+  const rules = loadBlockRules();
+  if (!rules.blockedExtensions.includes(extension)) {
+    rules.blockedExtensions.push(extension);
+    return saveBlockRules(rules);
+  }
+  return true;
+});
+
+ipcMain.handle('add-block-path', async (event, filePath) => {
+  const rules = loadBlockRules();
+  if (!rules.blockedPaths.includes(filePath)) {
+    rules.blockedPaths.push(filePath);
+    return saveBlockRules(rules);
+  }
+  return true;
+});
+
+ipcMain.handle('remove-block-extension', async (event, extension) => {
+  const rules = loadBlockRules();
+  rules.blockedExtensions = rules.blockedExtensions.filter(ext => ext !== extension);
+  return saveBlockRules(rules);
+});
+
+ipcMain.handle('remove-block-path', async (event, filePath) => {
+  const rules = loadBlockRules();
+  rules.blockedPaths = rules.blockedPaths.filter(path => path !== filePath);
+  return saveBlockRules(rules);
 });
 
 ipcMain.handle('open-file', async (event, filePath) => {
@@ -80,6 +166,7 @@ ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
 async function getDirectoryTree(dirPath) {
   const stats = await fs.promises.stat(dirPath);
   const name = path.basename(dirPath);
+  const rules = loadBlockRules();
   
   const node = {
     name: name || dirPath,
@@ -95,13 +182,20 @@ async function getDirectoryTree(dirPath) {
       node.children = [];
       
       for (const child of children) {
-        // 屏蔽 .assets 后缀的文件夹
+        const childPath = path.join(dirPath, child);
+        
+        // 检查是否被屏蔽
+        if (isBlocked(childPath, child, rules)) {
+          console.log(`Skipping blocked item: ${child}`);
+          continue;
+        }
+        
+        // 屏蔽 .assets 后缀的文件夹（保留原有逻辑）
         if (child.endsWith('.assets')) {
           console.log(`Skipping .assets folder: ${child}`);
           continue;
         }
         
-        const childPath = path.join(dirPath, child);
         try {
           const childNode = await getDirectoryTree(childPath);
           node.children.push(childNode);

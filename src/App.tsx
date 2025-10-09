@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import FileTree from './components/FileTree';
+import BlockManager from './components/BlockManager';
 import fileSystemService from './services/fileSystem';
 import { FileNode } from './types';
 import './App.css';
@@ -14,6 +15,7 @@ const App: React.FC = () => {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [contextMenuTarget, setContextMenuTarget] = useState<string | null>(null);
   const [contextMenuNode, setContextMenuNode] = useState<FileNode | null>(null);
+  const [showBlockManager, setShowBlockManager] = useState<boolean>(false);
 
   // 初始化时加载用户主目录
   useEffect(() => {
@@ -54,7 +56,29 @@ const App: React.FC = () => {
 
   const handleRightClick = (e: React.MouseEvent, path: string) => {
     e.preventDefault();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    
+    // 计算菜单位置，确保不会超出屏幕
+    const menuWidth = 200;
+    const menuHeight = 50;
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // 检查右边界
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 10;
+    }
+    
+    // 检查下边界
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 10;
+    }
+    
+    // 确保不会超出左上边界
+    x = Math.max(10, x);
+    y = Math.max(10, y);
+    
+    setContextMenuPosition({ x, y });
     setContextMenuTarget(path);
     setShowContextMenu(true);
   };
@@ -62,7 +86,29 @@ const App: React.FC = () => {
   const handleFileTreeRightClick = (e: React.MouseEvent, node: FileNode) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    
+    // 计算菜单位置，确保不会超出屏幕
+    const menuWidth = 250; // 预估菜单宽度
+    const menuHeight = node.type === 'file' && node.name.includes('.') ? 120 : 80; // 预估菜单高度
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    // 检查右边界
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 10;
+    }
+    
+    // 检查下边界
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 10;
+    }
+    
+    // 确保不会超出左上边界
+    x = Math.max(10, x);
+    y = Math.max(10, y);
+    
+    setContextMenuPosition({ x, y });
     setContextMenuNode(node);
     setContextMenuTarget(null); // 清除收藏夹的右键菜单目标
     setShowContextMenu(true);
@@ -76,10 +122,46 @@ const App: React.FC = () => {
       if (!success) {
         console.error('Failed to open in explorer');
       }
+    } else if (action === 'blockFile' && contextMenuNode) {
+      // 屏蔽该文件/文件夹
+      const success = await fileSystemService.addBlockPath(contextMenuNode.path);
+      if (success) {
+        console.log(`已屏蔽: ${contextMenuNode.path}`);
+        // 重新加载当前目录以更新显示
+        if (currentPath) {
+          loadDirectory(currentPath);
+        }
+      } else {
+        setError('屏蔽失败');
+      }
+    } else if (action === 'blockExtension' && contextMenuNode && contextMenuNode.type === 'file') {
+      // 屏蔽该类型文件
+      const fileName = contextMenuNode.name;
+      const extension = fileName.includes('.') ? '.' + fileName.split('.').pop()?.toLowerCase() : '';
+      
+      if (extension) {
+        const success = await fileSystemService.addBlockExtension(extension);
+        if (success) {
+          console.log(`已屏蔽扩展名: ${extension}`);
+          // 重新加载当前目录以更新显示
+          if (currentPath) {
+            loadDirectory(currentPath);
+          }
+        } else {
+          setError('屏蔽扩展名失败');
+        }
+      }
     }
     setShowContextMenu(false);
     setContextMenuTarget(null);
     setContextMenuNode(null);
+  };
+
+  const handleBlockRulesChanged = () => {
+    // 当屏蔽规则改变时，重新加载当前目录
+    if (currentPath) {
+      loadDirectory(currentPath);
+    }
   };
 
   useEffect(() => {
@@ -163,6 +245,14 @@ const App: React.FC = () => {
             className="path-input"
           />
           <button type="submit" className="path-button">浏览</button>
+          <button 
+            type="button"
+            onClick={() => setShowBlockManager(true)}
+            className="block-manager-button"
+            title="屏蔽管理"
+          >
+            🚫
+          </button>
         </form>
       </header>
 
@@ -224,15 +314,38 @@ const App: React.FC = () => {
             </div>
           )}
           {contextMenuNode && (
-            <div
-              className="context-menu-item"
-              onClick={() => handleContextMenuAction('openInExplorer')}
-            >
-              📂 在文件浏览器中打开
-            </div>
+            <>
+              <div
+                className="context-menu-item"
+                onClick={() => handleContextMenuAction('openInExplorer')}
+              >
+                📂 在文件浏览器中打开
+              </div>
+              <div
+                className="context-menu-item"
+                onClick={() => handleContextMenuAction('blockFile')}
+              >
+                🚫 屏蔽{contextMenuNode.type === 'directory' ? '该文件夹' : '该文件'}
+              </div>
+              {contextMenuNode.type === 'file' && contextMenuNode.name.includes('.') && (
+                <div
+                  className="context-menu-item"
+                  onClick={() => handleContextMenuAction('blockExtension')}
+                >
+                  🚫 屏蔽该类型文件 (.{contextMenuNode.name.split('.').pop()})
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
+
+      {/* 屏蔽管理器 */}
+      <BlockManager
+        isOpen={showBlockManager}
+        onClose={() => setShowBlockManager(false)}
+        onBlockRulesChanged={handleBlockRulesChanged}
+      />
     </div>
   );
 };

@@ -75,6 +75,21 @@
   background-color: #2980b9;
 }
 
+.block-manager-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.block-manager-button:hover {
+  background-color: #c82333;
+}
+
 .app-body {
   flex: 1;
   display: flex;
@@ -173,18 +188,26 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 120px;
+  min-width: 200px;
+  max-width: 280px;
+  max-height: 300px;
+  overflow-y: auto;
   z-index: 1000;
 }
 
 .context-menu-item {
-  padding: 8px 16px;
+  padding: 10px 16px;
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
 }
 
 .context-menu-item:hover {
@@ -197,6 +220,10 @@
 
 .context-menu-item:last-child {
   border-radius: 0 0 4px 4px;
+}
+
+.context-menu-item:only-child {
+  border-radius: 4px;
 }
 
 /* 响应式设计 */
@@ -224,5 +251,17 @@
   
   .favorites {
     margin-top: 8px;
+  }
+  
+  /* 小屏幕上的右键菜单优化 */
+  .context-menu {
+    min-width: 180px;
+    max-width: 90vw;
+    max-height: 50vh;
+  }
+  
+  .context-menu-item {
+    padding: 12px 16px;
+    font-size: 16px;
   }
 }
