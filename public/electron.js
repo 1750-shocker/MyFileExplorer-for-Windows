@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -8,6 +8,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    autoHideMenuBar: true,  // 隐藏菜单栏
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -15,6 +16,9 @@ function createWindow() {
     },
     icon:path.join(__dirname, '../build/icon.ico')
   });
+
+  // 完全移除应用菜单
+  Menu.setApplicationMenu(null);
 
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
   
