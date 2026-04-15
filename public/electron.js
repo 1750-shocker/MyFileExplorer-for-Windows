@@ -15,7 +15,7 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    icon:path.join(__dirname, '../build/icon.ico')
+    icon:path.join(__dirname, '../build/favicon.ico')
   });
 
   // 完全移除应用菜单
@@ -105,6 +105,16 @@ ipcMain.handle('get-directory-tree', async (event, dirPath) => {
   }
 });
 
+// 只读取目录的直接子项（不递归），用于懒加载
+ipcMain.handle('get-directory-children', async (event, dirPath) => {
+  try {
+    return await getDirectoryChildren(dirPath);
+  } catch (error) {
+    console.error('Error reading directory children:', error);
+    return null;
+  }
+});
+
 // IPC handlers for block rules
 ipcMain.handle('get-block-rules', async () => {
   return loadBlockRules();
@@ -162,6 +172,72 @@ ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
     return false;
   }
 });
+
+// 只读取目录的直接子项（不递归），每个子项若是目录则标记 hasChildren
+async function getDirectoryChildren(dirPath) {
+  const rules = loadBlockRules();
+  try {
+    const entries = await fs.promises.readdir(dirPath);
+    const children = [];
+
+    for (const entry of entries) {
+      const childPath = path.join(dirPath, entry);
+
+      // 检查是否被屏蔽
+      if (isBlocked(childPath, entry, rules)) {
+        continue;
+      }
+      // 屏蔽 .assets 后缀的文件夹
+      if (entry.endsWith('.assets')) {
+        continue;
+      }
+
+      try {
+        const stats = await fs.promises.stat(childPath);
+        const isDir = stats.isDirectory();
+        const node = {
+          name: entry,
+          path: childPath,
+          type: isDir ? 'directory' : 'file',
+          size: stats.size,
+          lastModified: stats.mtime,
+          loaded: false,   // 子目录尚未加载子项
+          hasChildren: false
+        };
+
+        if (isDir) {
+          // 快速检测该目录是否有可见子项（只列一层，不递归）
+          try {
+            const subEntries = await fs.promises.readdir(childPath);
+            const visibleSubEntries = subEntries.filter(sub => {
+              const subPath = path.join(childPath, sub);
+              return !isBlocked(subPath, sub, rules) && !sub.endsWith('.assets');
+            });
+            node.hasChildren = visibleSubEntries.length > 0;
+          } catch (_) {
+            node.hasChildren = false;
+          }
+          node.children = []; // 初始为空，展开时懒加载
+        }
+
+        children.push(node);
+      } catch (error) {
+        console.warn(`Skipping ${childPath}:`, error.message);
+      }
+    }
+
+    // 目录优先，同类按名排序
+    children.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return children;
+  } catch (error) {
+    console.warn(`Cannot read directory ${dirPath}:`, error.message);
+    return [];
+  }
+}
 
 async function getDirectoryTree(dirPath) {
   const stats = await fs.promises.stat(dirPath);

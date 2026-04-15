@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import FileTree from './components/FileTree';
 import BlockManager from './components/BlockManager';
 import fileSystemService from './services/fileSystem';
@@ -17,12 +17,11 @@ const App: React.FC = () => {
   const [contextMenuNode, setContextMenuNode] = useState<FileNode | null>(null);
   const [showBlockManager, setShowBlockManager] = useState<boolean>(false);
 
-  // 初始化时加载用户主目录
+  // 用于竞态保护的请求 ID，防止旧的异步请求覆盖最新结果
+  const loadIdRef = useRef(0);
+
+  // 初始化时只加载收藏夹，不自动加载任何目录
   useEffect(() => {
-    const initPath = fileSystemService.getCommonPaths()[0];
-    if (initPath) {
-      loadDirectory(initPath);
-    }
     loadFavorites();
   }, []);
 
@@ -178,23 +177,45 @@ const App: React.FC = () => {
   }, [showContextMenu]);
 
   const loadDirectory = async (dirPath: string) => {
+    // 竞态保护：记录本次请求的 ID，若后续有新请求则忽略旧结果
+    loadIdRef.current += 1;
+    const currentLoadId = loadIdRef.current;
+
     setLoading(true);
     setError('');
-    
+
     try {
-      const tree = await fileSystemService.getDirectoryTree(dirPath);
-      if (tree) {
-        setCurrentTree(tree);
-        setCurrentPath(dirPath);
-      } else {
-        setError('无法读取目录');
-      }
+      // 只读取根目录的直接子项（懒加载模式，不递归）
+      const children = await fileSystemService.getDirectoryChildren(dirPath);
+      // 只处理最新一次请求的结果
+      if (currentLoadId !== loadIdRef.current) return;
+
+      // 构建根节点，子项已加载
+      const rootNode: FileNode = {
+        name: dirPath.split('\\').pop() || dirPath,
+        path: dirPath,
+        type: 'directory',
+        children,
+        loaded: true,
+        hasChildren: children.length > 0
+      };
+
+      setCurrentTree(rootNode);
+      setCurrentPath(dirPath);
     } catch (err) {
+      if (currentLoadId !== loadIdRef.current) return;
       setError('加载目录时出错');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (currentLoadId === loadIdRef.current) {
+        setLoading(false);
+      }
     }
+  };
+
+  // 懒加载回调：FileTree 展开子目录时调用
+  const handleLoadChildren = async (dirPath: string): Promise<FileNode[]> => {
+    return await fileSystemService.getDirectoryChildren(dirPath);
   };
 
   const handleFileClick = async (filePath: string) => {
@@ -288,6 +309,7 @@ const App: React.FC = () => {
                 onFileClick={handleFileClick}
                 onDirectoryClick={handleDirectoryClick}
                 onRightClick={handleFileTreeRightClick}
+                onLoadChildren={handleLoadChildren}
               />
             </div>
           )}

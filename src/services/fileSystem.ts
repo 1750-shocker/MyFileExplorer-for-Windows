@@ -142,6 +142,22 @@ class FileSystemService {
     }
   }
 
+  // 懒加载：只获取目录的直接子项（不递归）
+  async getDirectoryChildren(dirPath: string): Promise<FileNode[]> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return [];
+    }
+
+    try {
+      const children = await this.ipcRenderer.invoke('get-directory-children', dirPath);
+      return children ?? [];
+    } catch (error) {
+      console.error('Error getting directory children:', error);
+      return [];
+    }
+  }
+
   // 获取常用目录路径
   getCommonPaths(): string[] {
     const os = window.require?.('os');
