@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileNode, FileTreeProps } from '../types';
 import './FileTree.css';
 
@@ -8,9 +8,11 @@ const FileTree: React.FC<FileTreeProps> = ({
   onDirectoryClick,
   onRightClick,
   onLoadChildren,
+  refreshTarget,
   level = 0
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // 顶层节点(level === 0)默认展开，以优化用户体验（如从收藏栏点击后直接显示内容）
+  const [isExpanded, setIsExpanded] = useState(level === 0);
   const [children, setChildren] = useState<FileNode[]>(node.children ?? []);
   const [loaded, setLoaded] = useState<boolean>(node.loaded ?? false);
   const [loadingChildren, setLoadingChildren] = useState(false);
@@ -42,6 +44,28 @@ const FileTree: React.FC<FileTreeProps> = ({
       onRightClick(e, node);
     }
   };
+
+  // 响应刷新指令：当 refreshTarget.path 匹配本节点时重新加载子项
+  useEffect(() => {
+    if (!refreshTarget || refreshTarget.path !== node.path) return;
+    if (node.type !== 'directory' || !onLoadChildren) return;
+
+    if (isExpanded) {
+      setLoadingChildren(true);
+      onLoadChildren(node.path)
+        .then(result => {
+          setChildren(result);
+          setLoaded(true);
+        })
+        .catch(() => {})
+        .finally(() => setLoadingChildren(false));
+    } else {
+      // 未展开：清除缓存，下次展开时重新拉取
+      setLoaded(false);
+      setChildren([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTarget]);
 
   const getIcon = () => {
     if (node.type === 'directory') {
@@ -118,6 +142,7 @@ const FileTree: React.FC<FileTreeProps> = ({
               onDirectoryClick={onDirectoryClick}
               onRightClick={onRightClick}
               onLoadChildren={onLoadChildren}
+              refreshTarget={refreshTarget}
               level={level + 1}
             />
           ))}

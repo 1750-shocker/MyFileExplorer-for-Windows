@@ -19,5 +19,6 @@ export interface FileTreeProps {
   onDirectoryClick: (dirPath: string) => void;
   onRightClick?: (e: MouseEvent, node: FileNode) => void;
   onLoadChildren?: (dirPath: string) => Promise<FileNode[]>;
+  refreshTarget?: { path: string; version: number } | null;
   level?: number;
 }

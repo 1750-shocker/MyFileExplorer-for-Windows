@@ -161,6 +161,16 @@ ipcMain.handle('open-file', async (event, filePath) => {
   }
 });
 
+ipcMain.handle('delete-path', async (event, targetPath) => {
+  try {
+    await fs.promises.rm(targetPath, { recursive: true, force: true });
+    return true;
+  } catch (error) {
+    console.error('Error deleting path:', error);
+    return false;
+  }
+});
+
 ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
   try {
     const { shell } = require('electron');

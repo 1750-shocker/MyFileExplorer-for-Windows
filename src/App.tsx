@@ -16,6 +16,9 @@ const App: React.FC = () => {
   const [contextMenuTarget, setContextMenuTarget] = useState<string | null>(null);
   const [contextMenuNode, setContextMenuNode] = useState<FileNode | null>(null);
   const [showBlockManager, setShowBlockManager] = useState<boolean>(false);
+  const [refreshTarget, setRefreshTarget] = useState<{ path: string; version: number } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [deleteTarget, setDeleteTarget] = useState<FileNode | null>(null);
 
   // 用于竞态保护的请求 ID，防止旧的异步请求覆盖最新结果
   const loadIdRef = useRef(0);
@@ -113,9 +116,24 @@ const App: React.FC = () => {
     setShowContextMenu(true);
   };
 
+  const getParentPath = (filePath: string): string => {
+    const parts = filePath.split('\\');
+    if (parts.length <= 1) return filePath;
+    parts.pop();
+    return parts.join('\\');
+  };
+
   const handleContextMenuAction = async (action: string) => {
     if (action === 'delete' && contextMenuTarget) {
       removeFromFavorites(contextMenuTarget);
+    } else if (action === 'refresh' && contextMenuNode) {
+      const targetPath = contextMenuNode.type === 'directory'
+        ? contextMenuNode.path
+        : getParentPath(contextMenuNode.path);
+      setRefreshTarget(prev => ({ path: targetPath, version: (prev?.version ?? 0) + 1 }));
+    } else if (action === 'deleteFile' && contextMenuNode) {
+      setDeleteTarget(contextMenuNode);
+      setShowDeleteConfirm(true);
     } else if (action === 'openInExplorer' && contextMenuNode) {
       const success = await fileSystemService.openInExplorer(contextMenuNode.path);
       if (!success) {
@@ -161,6 +179,28 @@ const App: React.FC = () => {
     if (currentPath) {
       loadDirectory(currentPath);
     }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setShowDeleteConfirm(false);
+
+    const parentPath = getParentPath(deleteTarget.path);
+    const success = await fileSystemService.deletePath(deleteTarget.path);
+
+    if (success) {
+      if (deleteTarget.path === currentPath) {
+        // 删除的是根目录本身，清空视图
+        setCurrentTree(null);
+        setCurrentPath('');
+      } else {
+        // 刷新父目录以更新显示
+        setRefreshTarget(prev => ({ path: parentPath, version: (prev?.version ?? 0) + 1 }));
+      }
+    } else {
+      setError('删除失败');
+    }
+    setDeleteTarget(null);
   };
 
   useEffect(() => {
@@ -305,11 +345,13 @@ const App: React.FC = () => {
           {currentTree && !loading && (
             <div className="file-tree-container">
               <FileTree
+                key={currentTree.path}
                 node={currentTree}
                 onFileClick={handleFileClick}
                 onDirectoryClick={handleDirectoryClick}
                 onRightClick={handleFileTreeRightClick}
                 onLoadChildren={handleLoadChildren}
+                refreshTarget={refreshTarget}
               />
             </div>
           )}
@@ -339,6 +381,12 @@ const App: React.FC = () => {
             <>
               <div
                 className="context-menu-item"
+                onClick={() => handleContextMenuAction('refresh')}
+              >
+                🔄 刷新
+              </div>
+              <div
+                className="context-menu-item"
                 onClick={() => handleContextMenuAction('openInExplorer')}
               >
                 📂 在文件浏览器中打开
@@ -357,6 +405,13 @@ const App: React.FC = () => {
                   🚫 屏蔽该类型文件 (.{contextMenuNode.name.split('.').pop()})
                 </div>
               )}
+              <div className="context-menu-divider" />
+              <div
+                className="context-menu-item context-menu-item-danger"
+                onClick={() => handleContextMenuAction('deleteFile')}
+              >
+                🗑️ 删除{contextMenuNode.type === 'directory' ? '文件夹' : '文件'}
+              </div>
             </>
           )}
         </div>
@@ -368,6 +423,24 @@ const App: React.FC = () => {
         onClose={() => setShowBlockManager(false)}
         onBlockRulesChanged={handleBlockRulesChanged}
       />
+
+      {/* 删除确认对话框 */}
+      {showDeleteConfirm && deleteTarget && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">确认删除</h3>
+            <p className="modal-body">
+              确定要删除 <strong>"{deleteTarget.name}"</strong> 吗？
+              {deleteTarget.type === 'directory' && ' 这将删除文件夹内所有内容。'}
+              <br />此操作不可撤销。
+            </p>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)}>取消</button>
+              <button className="btn-danger" onClick={handleDeleteConfirm}>删除</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

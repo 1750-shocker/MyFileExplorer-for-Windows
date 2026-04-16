@@ -158,6 +158,22 @@ class FileSystemService {
     }
   }
 
+  // 删除文件或文件夹
+  async deletePath(targetPath: string): Promise<boolean> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return false;
+    }
+
+    try {
+      const result = await this.ipcRenderer.invoke('delete-path', targetPath);
+      return result;
+    } catch (error) {
+      console.error('Error deleting path:', error);
+      return false;
+    }
+  }
+
   // 获取常用目录路径
   getCommonPaths(): string[] {
     const os = window.require?.('os');
