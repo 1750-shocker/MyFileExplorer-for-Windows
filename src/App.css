@@ -327,7 +327,7 @@
 
 .context-menu-item {
   padding: 10px 16px;
-  cursor: pointer;
+  cursor: grab;
   font-size: 14px;
   transition: background-color 0.2s;
   display: flex;
@@ -338,9 +338,25 @@
   background: none;
   width: 100%;
   text-align: left;
+  user-select: none;
 }
 
-.context-menu-item:hover {
+.context-menu-item:active {
+  cursor: grabbing;
+}
+
+.context-menu-item.dragging {
+  opacity: 0.5;
+  background-color: #f8f9fa;
+  border: 1px dashed #999;
+}
+
+.context-menu-item.drag-over {
+  border-top: 2px solid #3498db;
+  transform: translateY(2px);
+}
+
+.context-menu-item:hover:not(.dragging) {
   background-color: #f8f9fa;
 }
 

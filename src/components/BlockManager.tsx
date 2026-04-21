@@ -74,7 +74,9 @@ const BlockManager: React.FC<BlockManagerProps> = ({ isOpen, onClose, onBlockRul
                   <div className="block-list">
                     {blockRules.blockedExtensions.map((ext, index) => (
                       <div key={index} className="block-item">
-                        <span className="block-text">{ext}</span>
+                        <span className="block-text">
+                          {ext === '.<数字后缀>' ? '所有数字后缀 (如 .001, .002)' : ext}
+                        </span>
                         <button
                           className="unblock-button"
                           onClick={() => removeBlockExtension(ext)}

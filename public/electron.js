@@ -97,6 +97,11 @@ const isBlocked = (filePath, fileName, rules) => {
     return true;
   }
   
+  // 检查是否包含特殊规则：屏蔽所有数字后缀（如 .001, .002）
+  if (ext && /^\.\d+$/.test(ext) && rules.blockedExtensions.includes('.<数字后缀>')) {
+    return true;
+  }
+  
   return false;
 };
 

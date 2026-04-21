@@ -39,6 +39,12 @@ const App: React.FC = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  // 文件右键菜单拖拽排序状态
+  const defaultMenuOrder = ['refresh', 'openInExplorer', 'copyPath', 'blockFile', 'blockExtension', 'deleteFile'];
+  const [menuOrder, setMenuOrder] = useState<string[]>(defaultMenuOrder);
+  const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
+  const [dragOverMenuId, setDragOverMenuId] = useState<string | null>(null);
+
   // 用于记录鼠标在弹窗外部按下和抬起的位置，防止选中文字拖拽时误触关闭
   const modalMouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
@@ -50,7 +56,30 @@ const App: React.FC = () => {
   // 初始化时只加载收藏夹，不自动加载任何目录
   useEffect(() => {
     loadFavorites();
+    loadMenuOrder();
   }, []);
+
+  const loadMenuOrder = () => {
+    const savedOrder = localStorage.getItem('fileContextMenuOrder');
+    if (savedOrder) {
+      try {
+        const parsed = JSON.parse(savedOrder);
+        if (Array.isArray(parsed)) {
+          // 确保所有默认项都在，且没有多余的项
+          const validOrder = parsed.filter((id: string) => defaultMenuOrder.includes(id));
+          const missingItems = defaultMenuOrder.filter(id => !validOrder.includes(id));
+          setMenuOrder([...validOrder, ...missingItems]);
+        }
+      } catch (e) {
+        console.error('Failed to parse menu order', e);
+      }
+    }
+  };
+
+  const saveMenuOrder = (newOrder: string[]) => {
+    localStorage.setItem('fileContextMenuOrder', JSON.stringify(newOrder));
+    setMenuOrder(newOrder);
+  };
 
   const loadFavorites = () => {
     const savedFavorites = localStorage.getItem('pathFavorites');
@@ -130,12 +159,48 @@ const App: React.FC = () => {
     setDragOverIndex(null);
   };
 
+  const handleMenuDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    setDraggedMenuId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleMenuDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    e.preventDefault();
+    if (draggedMenuId === null || draggedMenuId === id) return;
+    setDragOverMenuId(id);
+  };
+
+  const handleMenuDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOverMenuId(null);
+  };
+
+  const handleMenuDrop = (e: React.DragEvent<HTMLDivElement>, targetId: string) => {
+    e.preventDefault();
+    if (draggedMenuId && draggedMenuId !== targetId) {
+      const newOrder = [...menuOrder];
+      const draggedIndex = newOrder.indexOf(draggedMenuId);
+      const targetIndex = newOrder.indexOf(targetId);
+      newOrder.splice(draggedIndex, 1);
+      newOrder.splice(targetIndex, 0, draggedMenuId);
+      saveMenuOrder(newOrder);
+    }
+    setDraggedMenuId(null);
+    setDragOverMenuId(null);
+  };
+
+  const handleMenuDragEnd = () => {
+    setDraggedMenuId(null);
+    setDragOverMenuId(null);
+  };
+
   const handleRightClick = (e: React.MouseEvent, path: string) => {
     e.preventDefault();
     
     // 计算菜单位置，确保不会超出屏幕
     const menuWidth = 200;
-    const menuHeight = 50;
+    const menuHeight = 100;
     
     let x = e.clientX;
     let y = e.clientY;
@@ -165,7 +230,7 @@ const App: React.FC = () => {
     
     // 计算菜单位置，确保不会超出屏幕
     const menuWidth = 250; // 预估菜单宽度
-    const menuHeight = node.type === 'file' && node.name.includes('.') ? 120 : 80; // 预估菜单高度
+    const menuHeight = 300; // 预估菜单高度，使用最大可能高度避免被截断
     
     let x = e.clientX;
     let y = e.clientY;
@@ -238,9 +303,15 @@ const App: React.FC = () => {
       const extension = fileName.includes('.') ? '.' + fileName.split('.').pop()?.toLowerCase() : '';
       
       if (extension) {
-        const success = await fileSystemService.addBlockExtension(extension);
+        let extToBlock = extension;
+        // 如果是数字后缀，则转换为统一的特殊规则
+        if (/^\.\d+$/.test(extension)) {
+          extToBlock = '.<数字后缀>';
+        }
+        
+        const success = await fileSystemService.addBlockExtension(extToBlock);
         if (success) {
-          console.log(`已屏蔽扩展名: ${extension}`);
+          console.log(`已屏蔽扩展名: ${extToBlock}`);
           // 重新加载当前目录以更新显示
           if (currentPath) {
             loadDirectory(currentPath);
@@ -510,6 +581,57 @@ const App: React.FC = () => {
     modalMouseDownPos.current = null;
   };
 
+  const renderMenuItem = (id: string, node: FileNode) => {
+    let label = '';
+    let action = '';
+    let isDanger = false;
+    let isVisible = true;
+
+    switch (id) {
+      case 'refresh':
+        label = '🔄 刷新'; action = 'refresh'; break;
+      case 'openInExplorer':
+        label = '📂 在文件浏览器中打开'; action = 'openInExplorer'; break;
+      case 'copyPath':
+        label = '📋 复制绝对路径'; action = 'copyPath'; break;
+      case 'blockFile':
+        label = `🚫 屏蔽${node.type === 'directory' ? '该文件夹' : '该文件'}`; action = 'blockFile'; break;
+      case 'blockExtension':
+        isVisible = node.type === 'file' && node.name.includes('.');
+        if (isVisible) {
+          const ext = '.' + node.name.split('.').pop()?.toLowerCase();
+          if (/^\.\d+$/.test(ext)) {
+            label = `🚫 屏蔽该类型文件 (所有数字后缀如 .001等)`;
+          } else {
+            label = `🚫 屏蔽该类型文件 (${ext})`;
+          }
+        }
+        action = 'blockExtension'; 
+        break;
+      case 'deleteFile':
+        label = `🗑️ 删除${node.type === 'directory' ? '文件夹' : '文件'}`; action = 'deleteFile'; isDanger = true; break;
+      default: return null;
+    }
+
+    if (!isVisible) return null;
+
+    return (
+      <div
+        key={id}
+        draggable
+        onDragStart={(e) => handleMenuDragStart(e, id)}
+        onDragOver={(e) => handleMenuDragOver(e, id)}
+        onDragLeave={handleMenuDragLeave}
+        onDrop={(e) => handleMenuDrop(e, id)}
+        onDragEnd={handleMenuDragEnd}
+        className={`context-menu-item ${isDanger ? 'context-menu-item-danger' : ''} ${draggedMenuId === id ? 'dragging' : ''} ${dragOverMenuId === id ? 'drag-over' : ''}`}
+        onClick={() => handleContextMenuAction(action)}
+      >
+        {label}
+      </div>
+    );
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -670,45 +792,18 @@ const App: React.FC = () => {
           )}
           {contextMenuNode && (
             <>
-              <div
-                className="context-menu-item"
-                onClick={() => handleContextMenuAction('refresh')}
-              >
-                🔄 刷新
-              </div>
-              <div
-                className="context-menu-item"
-                onClick={() => handleContextMenuAction('openInExplorer')}
-              >
-                📂 在文件浏览器中打开
-              </div>
-              <div
-                className="context-menu-item"
-                onClick={() => handleContextMenuAction('copyPath')}
-              >
-                📋 复制绝对路径
-              </div>
-              <div
-                className="context-menu-item"
-                onClick={() => handleContextMenuAction('blockFile')}
-              >
-                🚫 屏蔽{contextMenuNode.type === 'directory' ? '该文件夹' : '该文件'}
-              </div>
-              {contextMenuNode.type === 'file' && contextMenuNode.name.includes('.') && (
-                <div
-                  className="context-menu-item"
-                  onClick={() => handleContextMenuAction('blockExtension')}
-                >
-                  🚫 屏蔽该类型文件 (.{contextMenuNode.name.split('.').pop()})
-                </div>
-              )}
-              <div className="context-menu-divider" />
-              <div
-                className="context-menu-item context-menu-item-danger"
-                onClick={() => handleContextMenuAction('deleteFile')}
-              >
-                🗑️ 删除{contextMenuNode.type === 'directory' ? '文件夹' : '文件'}
-              </div>
+              {menuOrder.map(id => {
+                const menuItem = renderMenuItem(id, contextMenuNode);
+                if (id === 'deleteFile' && menuItem) {
+                  return (
+                    <React.Fragment key={id}>
+                      <div className="context-menu-divider" />
+                      {menuItem}
+                    </React.Fragment>
+                  );
+                }
+                return menuItem;
+              })}
             </>
           )}
         </div>
