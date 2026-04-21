@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "mcp__rag-knowledge-base__search_knowledge_base"
+      "mcp__rag-knowledge-base__search_knowledge_base",
+      "Bash(npx electron-builder *)",
+      "Bash(npm run *)",
+      "Bash(echo \"PID: $!\")",
+      "WebFetch(domain:www.clashverge.dev)"
     ]
   }
 }

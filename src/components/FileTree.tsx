@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileNode, FileTreeProps } from '../types';
 import './FileTree.css';
 
@@ -9,13 +9,15 @@ const FileTree: React.FC<FileTreeProps> = ({
   onRightClick,
   onLoadChildren,
   refreshTarget,
-  level = 0
+  level = 0,
+  activePath
 }) => {
   // 顶层节点(level === 0)默认展开，以优化用户体验（如从收藏栏点击后直接显示内容）
   const [isExpanded, setIsExpanded] = useState(level === 0);
   const [children, setChildren] = useState<FileNode[]>(node.children ?? []);
   const [loaded, setLoaded] = useState<boolean>(node.loaded ?? false);
   const [loadingChildren, setLoadingChildren] = useState(false);
+  const processedActivePathRef = useRef<string | null>(null);
 
   const handleClick = async () => {
     if (node.type === 'directory') {
@@ -67,6 +69,42 @@ const FileTree: React.FC<FileTreeProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTarget]);
 
+  // 响应 activePath 展开（仅在 activePath 变化时处理，避免与手动折叠冲突）
+  useEffect(() => {
+    if (!activePath || activePath === processedActivePathRef.current) return;
+
+    const isTarget = activePath === node.path;
+    const isAncestor = activePath.startsWith(node.path + '\\');
+
+    if (isAncestor || isTarget) {
+      processedActivePathRef.current = activePath;
+
+      if (node.type === 'directory') {
+        setIsExpanded(true);
+        if (!loaded && onLoadChildren) {
+          setLoadingChildren(true);
+          onLoadChildren(node.path)
+            .then(result => {
+              setChildren(result);
+              setLoaded(true);
+            })
+            .catch(() => {})
+            .finally(() => setLoadingChildren(false));
+        }
+      }
+
+      if (isTarget) {
+        setTimeout(() => {
+          const element = document.getElementById(`node-${node.path.replace(/\\/g, '-')}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 200);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePath]);
+
   const getIcon = () => {
     if (node.type === 'directory') {
       return isExpanded ? '📂' : '📁';
@@ -111,7 +149,8 @@ const FileTree: React.FC<FileTreeProps> = ({
   return (
     <div className="file-tree-node">
       <div
-        className={`file-tree-item ${node.type}`}
+        id={`node-${node.path.replace(/\\/g, '-')}`}
+        className={`file-tree-item ${node.type} ${activePath === node.path ? 'active-node' : ''}`}
         style={{ paddingLeft: `${level * 20}px` }}
         onClick={handleClick}
         onContextMenu={handleRightClick}
@@ -144,6 +183,7 @@ const FileTree: React.FC<FileTreeProps> = ({
               onLoadChildren={onLoadChildren}
               refreshTarget={refreshTarget}
               level={level + 1}
+              activePath={activePath}
             />
           ))}
         </div>

@@ -21,4 +21,5 @@ export interface FileTreeProps {
   onLoadChildren?: (dirPath: string) => Promise<FileNode[]>;
   refreshTarget?: { path: string; version: number } | null;
   level?: number;
+  activePath?: string | null;
 }

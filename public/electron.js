@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -29,6 +29,11 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
   }
+
+  // F12 在任意模式下均可打开 DevTools，方便调试
+  globalShortcut.register('F12', () => {
+    mainWindow.webContents.toggleDevTools();
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -115,6 +120,54 @@ ipcMain.handle('get-directory-children', async (event, dirPath) => {
   }
 });
 
+ipcMain.handle('search-files', async (event, { dirPath, keyword }) => {
+  try {
+    return await searchFiles(dirPath, keyword.toLowerCase());
+  } catch (error) {
+    console.error('Error searching files:', error);
+    return [];
+  }
+});
+
+async function searchFiles(dirPath, keyword) {
+  const rules = loadBlockRules();
+  const results = [];
+  const maxResults = 100; // 限制最多结果数，防止卡死
+
+  async function walk(currentPath) {
+    if (results.length >= maxResults) return;
+    try {
+      const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (results.length >= maxResults) break;
+        const entryPath = path.join(currentPath, entry.name);
+        
+        // 检查是否被屏蔽
+        if (isBlocked(entryPath, entry.name, rules)) continue;
+        if (entry.name.endsWith('.assets')) continue;
+        
+        if (entry.name.toLowerCase().includes(keyword)) {
+          results.push({
+            name: entry.name,
+            path: entryPath,
+            type: entry.isDirectory() ? 'directory' : 'file',
+            dir: currentPath
+          });
+        }
+        
+        if (entry.isDirectory()) {
+          await walk(entryPath);
+        }
+      }
+    } catch (error) {
+      console.warn(`Skipping ${currentPath}:`, error.message);
+    }
+  }
+
+  await walk(dirPath);
+  return results;
+}
+
 // IPC handlers for block rules
 ipcMain.handle('get-block-rules', async () => {
   return loadBlockRules();
@@ -187,53 +240,62 @@ ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
 async function getDirectoryChildren(dirPath) {
   const rules = loadBlockRules();
   try {
-    const entries = await fs.promises.readdir(dirPath);
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
     const children = [];
 
     for (const entry of entries) {
-      const childPath = path.join(dirPath, entry);
+      const childPath = path.join(dirPath, entry.name);
 
       // 检查是否被屏蔽
-      if (isBlocked(childPath, entry, rules)) {
+      if (isBlocked(childPath, entry.name, rules)) {
         continue;
       }
       // 屏蔽 .assets 后缀的文件夹
-      if (entry.endsWith('.assets')) {
+      if (entry.name.endsWith('.assets')) {
         continue;
       }
 
+      // 优先用 Dirent 自带的类型信息，避免 stat 失败导致条目丢失
+      const isDir = entry.isDirectory() || entry.isSymbolicLink() && await (async () => {
+        try { return (await fs.promises.stat(childPath)).isDirectory(); } catch { return false; }
+      })();
+
+      let size = 0;
+      let lastModified = new Date();
       try {
-        const stats = await fs.promises.stat(childPath);
-        const isDir = stats.isDirectory();
-        const node = {
-          name: entry,
-          path: childPath,
-          type: isDir ? 'directory' : 'file',
-          size: stats.size,
-          lastModified: stats.mtime,
-          loaded: false,   // 子目录尚未加载子项
-          hasChildren: false
-        };
-
-        if (isDir) {
-          // 快速检测该目录是否有可见子项（只列一层，不递归）
-          try {
-            const subEntries = await fs.promises.readdir(childPath);
-            const visibleSubEntries = subEntries.filter(sub => {
-              const subPath = path.join(childPath, sub);
-              return !isBlocked(subPath, sub, rules) && !sub.endsWith('.assets');
-            });
-            node.hasChildren = visibleSubEntries.length > 0;
-          } catch (_) {
-            node.hasChildren = false;
-          }
-          node.children = []; // 初始为空，展开时懒加载
-        }
-
-        children.push(node);
-      } catch (error) {
-        console.warn(`Skipping ${childPath}:`, error.message);
+        const stats = await fs.promises.lstat(childPath);
+        size = stats.size;
+        lastModified = stats.mtime;
+      } catch (_) {
+        // lstat 失败时仍显示条目，仅缺少元数据
       }
+
+      const node = {
+        name: entry.name,
+        path: childPath,
+        type: isDir ? 'directory' : 'file',
+        size,
+        lastModified,
+        loaded: false,
+        hasChildren: false
+      };
+
+      if (isDir) {
+        // 快速检测该目录是否有可见子项（只列一层，不递归）
+        try {
+          const subEntries = await fs.promises.readdir(childPath, { withFileTypes: true });
+          const visibleSubEntries = subEntries.filter(sub => {
+            const subPath = path.join(childPath, sub.name);
+            return !isBlocked(subPath, sub.name, rules) && !sub.name.endsWith('.assets');
+          });
+          node.hasChildren = visibleSubEntries.length > 0;
+        } catch (_) {
+          node.hasChildren = false;
+        }
+        node.children = []; // 初始为空，展开时懒加载
+      }
+
+      children.push(node);
     }
 
     // 目录优先，同类按名排序

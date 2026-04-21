@@ -30,6 +30,25 @@ npm run electron-dev
 npm run electron-pack
 ```
 
+## 打包为 Windows 可执行文件（win-unpacked）
+
+```bash
+npm run build:win
+```
+
+该命令会自动完成以下步骤，无需手动干预：
+
+1. 强制关闭正在运行的 `MyNoteExplorer.exe`（防止文件句柄锁定）
+2. 删除旧的 `release/win-unpacked` 目录（避免旧文件残留）
+3. 重新构建 React 前端
+4. 重新打包 Electron 应用
+
+打包完成后，可执行文件位于：
+
+```
+release/win-unpacked/MyNoteExplorer.exe
+```
+
 ## 项目结构
 
 ```

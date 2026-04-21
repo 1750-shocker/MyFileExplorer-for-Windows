@@ -25,7 +25,8 @@
     "electron": "electron .",
     "electron-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-pack": "npm run build && electron-builder",
-    "preelectron-pack": "npm run build"
+    "preelectron-pack": "npm run build",
+    "build:win": "taskkill /F /IM MyNoteExplorer.exe /T 2>nul & taskkill /F /IM electron.exe /T 2>nul & rmdir /s /q release\\win-unpacked 2>nul & npm run build && npx electron-builder --dir"
   },
   "eslintConfig": {
     "extends": [

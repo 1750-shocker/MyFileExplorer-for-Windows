@@ -186,6 +186,22 @@ class FileSystemService {
       `${os.homedir()}\\Downloads`,
     ];
   }
+
+  // 搜索文件
+  async searchFiles(dirPath: string, keyword: string): Promise<Array<{name: string, path: string, type: string, dir: string}>> {
+    if (!this.ipcRenderer) {
+      console.error('Electron IPC not available');
+      return [];
+    }
+
+    try {
+      const results = await this.ipcRenderer.invoke('search-files', { dirPath, keyword });
+      return results;
+    } catch (error) {
+      console.error('Error searching files:', error);
+      return [];
+    }
+  }
 }
 
 const fileSystemService = new FileSystemService();

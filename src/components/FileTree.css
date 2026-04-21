@@ -17,6 +17,12 @@
   background-color: #f0f0f0;
 }
 
+.file-tree-item.active-node {
+  background-color: #e3f2fd;
+  border-left: 3px solid #1976d2;
+  font-weight: 500;
+}
+
 .file-tree-item.directory {
   font-weight: 500;
 }
