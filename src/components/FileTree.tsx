@@ -10,7 +10,8 @@ const FileTree: React.FC<FileTreeProps> = ({
   onLoadChildren,
   refreshTarget,
   level = 0,
-  activePath
+  activePath,
+  onActivePathHandled
 }) => {
   // 顶层节点(level === 0)默认展开，以优化用户体验（如从收藏栏点击后直接显示内容）
   const [isExpanded, setIsExpanded] = useState(level === 0);
@@ -99,6 +100,7 @@ const FileTree: React.FC<FileTreeProps> = ({
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
+          onActivePathHandled?.(node.path);
         }, 200);
       }
     }
@@ -184,6 +186,7 @@ const FileTree: React.FC<FileTreeProps> = ({
               refreshTarget={refreshTarget}
               level={level + 1}
               activePath={activePath}
+              onActivePathHandled={onActivePathHandled}
             />
           ))}
         </div>

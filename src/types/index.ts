@@ -22,4 +22,5 @@ export interface FileTreeProps {
   refreshTarget?: { path: string; version: number } | null;
   level?: number;
   activePath?: string | null;
+  onActivePathHandled?: (path: string) => void;
 }

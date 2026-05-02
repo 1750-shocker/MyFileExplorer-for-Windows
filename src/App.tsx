@@ -528,6 +528,10 @@ const App: React.FC = () => {
     setSelectedResultIndex(-1);
   };
 
+  const handleActivePathHandled = (path: string) => {
+    setActivePath(current => current === path ? null : current);
+  };
+
   const highlightMatch = (text: string, keyword: string): React.ReactNode => {
     if (!keyword) return text;
     const lowerText = text.toLowerCase();
@@ -757,6 +761,7 @@ const App: React.FC = () => {
                 onLoadChildren={handleLoadChildren}
                 refreshTarget={refreshTarget}
                 activePath={activePath}
+                onActivePathHandled={handleActivePathHandled}
               />
             </div>
           )}
