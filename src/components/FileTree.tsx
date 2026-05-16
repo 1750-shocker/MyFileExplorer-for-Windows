@@ -100,7 +100,10 @@ const FileTree: React.FC<FileTreeProps> = ({
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
-          onActivePathHandled?.(node.path);
+          // 滚动定位后保持高亮 3 秒再清除
+          setTimeout(() => {
+            onActivePathHandled?.(node.path);
+          }, 3000);
         }, 200);
       }
     }
