@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FileNode, FileTreeProps } from '../types';
 import './FileTree.css';
 
+const toComparablePath = (filePath: string) =>
+  filePath.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
+
+const getNodeElementId = (filePath: string) => `node-${encodeURIComponent(filePath)}`;
+
 const FileTree: React.FC<FileTreeProps> = ({
   node,
   onFileClick,
@@ -74,8 +79,10 @@ const FileTree: React.FC<FileTreeProps> = ({
   useEffect(() => {
     if (!activePath || activePath === processedActivePathRef.current) return;
 
-    const isTarget = activePath === node.path;
-    const isAncestor = activePath.startsWith(node.path + '\\');
+    const comparableActivePath = toComparablePath(activePath);
+    const comparableNodePath = toComparablePath(node.path);
+    const isTarget = comparableActivePath === comparableNodePath;
+    const isAncestor = comparableActivePath.startsWith(comparableNodePath + '\\');
 
     if (isAncestor || isTarget) {
       processedActivePathRef.current = activePath;
@@ -96,7 +103,7 @@ const FileTree: React.FC<FileTreeProps> = ({
 
       if (isTarget) {
         setTimeout(() => {
-          const element = document.getElementById(`node-${node.path.replace(/\\/g, '-')}`);
+          const element = document.getElementById(getNodeElementId(node.path));
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -150,12 +157,15 @@ const FileTree: React.FC<FileTreeProps> = ({
   // 是否显示展开箭头：目录本身 hasChildren 为 true，或已加载到子项
   const showExpandArrow =
     node.type === 'directory' && (node.hasChildren || children.length > 0);
+  const isActive = activePath
+    ? toComparablePath(activePath) === toComparablePath(node.path)
+    : false;
 
   return (
     <div className="file-tree-node">
       <div
-        id={`node-${node.path.replace(/\\/g, '-')}`}
-        className={`file-tree-item ${node.type} ${activePath === node.path ? 'active-node' : ''}`}
+        id={getNodeElementId(node.path)}
+        className={`file-tree-item ${node.type} ${isActive ? 'active-node' : ''}`}
         style={{ paddingLeft: `${level * 20}px` }}
         onClick={handleClick}
         onContextMenu={handleRightClick}
@@ -178,9 +188,9 @@ const FileTree: React.FC<FileTreeProps> = ({
 
       {node.type === 'directory' && isExpanded && (
         <div className="file-tree-children">
-          {children.map((child, index) => (
+          {children.map(child => (
             <FileTree
-              key={`${child.path}-${index}`}
+              key={child.path}
               node={child}
               onFileClick={onFileClick}
               onDirectoryClick={onDirectoryClick}

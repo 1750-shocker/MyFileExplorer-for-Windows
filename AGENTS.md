@@ -4,7 +4,7 @@
 - This repo is a single-package Electron + Create React App app, not a monorepo.
 - Renderer entry: `src/index.tsx` -> `src/App.tsx`.
 - Electron main process: `public/electron.js`.
-- If you change file operations or add UI actions, update both `public/electron.js` IPC handlers and `src/services/fileSystem.ts`.
+- If you change file operations or add UI actions, update `public/electron.js` IPC handlers, `public/preload.js`, and `src/services/fileSystem.ts` together.
 
 ## Commands
 - Install: `npm install`
@@ -19,9 +19,9 @@
 - `npm test` is not a useful smoke test here right now: there are no tests, so `CI=true npm test -- --watchAll=false` exits with code 1 unless you add `--passWithNoTests`.
 
 ## Architecture Notes
-- The real file tree flow is lazy-loaded. `App.tsx` builds the root node from `getDirectoryChildren`; the old recursive `getDirectoryTree` API still exists in `public/electron.js` but is not the main UI path.
-- `FileTree.tsx` owns recursive rendering plus per-node expand/load behavior. Browsing bugs are often split between `App.tsx`, `FileTree.tsx`, and the IPC child-loading code.
-- Renderer Electron access depends on `window.require('electron')`; main window has `nodeIntegration: true` and `contextIsolation: false`. Do not introduce preload-only patterns unless the task includes migrating that architecture.
+- The file tree flow is lazy-loaded. `App.tsx` builds the root node from `getDirectoryChildren`; there is no recursive full-tree IPC path in the current app.
+- `FileTree.tsx` owns recursive rendering plus per-node expand/load behavior. Browsing bugs are often split between `App.tsx`, `FileTree.tsx`, preload bridge code, and the IPC child-loading code.
+- Renderer Electron access goes through `window.fileSystemApi` from `public/preload.js`; the main window has `nodeIntegration: false` and `contextIsolation: true`.
 
 ## Persisted State And Side Effects
 - Block rules are stored outside the repo in `~/.myfileexplorer-block-rules.json` from `public/electron.js`.

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, globalShortcut, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
 let mainWindow;
+let searchGeneration = 0;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -11,9 +12,9 @@ function createWindow() {
     height: 800,
     autoHideMenuBar: true,  // 隐藏菜单栏
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
     },
     icon:path.join(__dirname, '../build/favicon.ico')
   });
@@ -48,6 +49,10 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 // 屏蔽规则存储路径
@@ -105,16 +110,6 @@ const isBlocked = (filePath, fileName, rules) => {
   return false;
 };
 
-// IPC handlers for file system operations
-ipcMain.handle('get-directory-tree', async (event, dirPath) => {
-  try {
-    return await getDirectoryTree(dirPath);
-  } catch (error) {
-    console.error('Error reading directory:', error);
-    return null;
-  }
-});
-
 // 只读取目录的直接子项（不递归），用于懒加载
 ipcMain.handle('get-directory-children', async (event, dirPath) => {
   try {
@@ -125,26 +120,36 @@ ipcMain.handle('get-directory-children', async (event, dirPath) => {
   }
 });
 
-ipcMain.handle('search-files', async (event, { dirPath, keyword }) => {
+ipcMain.handle('search-files', async (event, { dirPath, keyword, generation }) => {
   try {
-    return await searchFiles(dirPath, keyword.toLowerCase());
+    const currentGeneration = Number.isFinite(generation) ? generation : searchGeneration + 1;
+    searchGeneration = Math.max(searchGeneration, currentGeneration);
+    return await searchFiles(dirPath, keyword.toLowerCase(), currentGeneration);
   } catch (error) {
     console.error('Error searching files:', error);
     return [];
   }
 });
 
-async function searchFiles(dirPath, keyword) {
+ipcMain.handle('cancel-search', async (event, generation) => {
+  const currentGeneration = Number.isFinite(generation) ? generation : searchGeneration + 1;
+  searchGeneration = Math.max(searchGeneration, currentGeneration);
+  return true;
+});
+
+async function searchFiles(dirPath, keyword, generation) {
   const rules = loadBlockRules();
   const results = [];
   const maxResults = 100; // 限制最多结果数，防止卡死
+  const isCancelled = () => generation < searchGeneration;
 
   async function walk(currentPath) {
-    if (results.length >= maxResults) return;
+    if (isCancelled() || results.length >= maxResults) return;
     try {
       const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+      if (isCancelled()) return;
       for (const entry of entries) {
-        if (results.length >= maxResults) break;
+        if (isCancelled() || results.length >= maxResults) break;
         const entryPath = path.join(currentPath, entry.name);
         
         // 检查是否被屏蔽
@@ -160,7 +165,7 @@ async function searchFiles(dirPath, keyword) {
           });
         }
         
-        if (entry.isDirectory()) {
+        if (entry.isDirectory() && !isCancelled()) {
           await walk(entryPath);
         }
       }
@@ -210,8 +215,11 @@ ipcMain.handle('remove-block-path', async (event, filePath) => {
 
 ipcMain.handle('open-file', async (event, filePath) => {
   try {
-    const { shell } = require('electron');
-    await shell.openPath(filePath);
+    const errorMessage = await shell.openPath(filePath);
+    if (errorMessage) {
+      console.error('Error opening file:', errorMessage);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error opening file:', error);
@@ -221,7 +229,7 @@ ipcMain.handle('open-file', async (event, filePath) => {
 
 ipcMain.handle('delete-path', async (event, targetPath) => {
   try {
-    await fs.promises.rm(targetPath, { recursive: true, force: true });
+    await shell.trashItem(targetPath);
     return true;
   } catch (error) {
     console.error('Error deleting path:', error);
@@ -231,7 +239,6 @@ ipcMain.handle('delete-path', async (event, targetPath) => {
 
 ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
   try {
-    const { shell } = require('electron');
     // 在Windows上，使用shell.showItemInFolder来在文件浏览器中显示文件/文件夹
     shell.showItemInFolder(pathToOpen);
     return true;
@@ -240,6 +247,18 @@ ipcMain.handle('open-in-explorer', async (event, pathToOpen) => {
     return false;
   }
 });
+
+async function hasVisibleChildren(dirPath, rules) {
+  try {
+    const subEntries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    return subEntries.some(sub => {
+      const subPath = path.join(dirPath, sub.name);
+      return !isBlocked(subPath, sub.name, rules) && !sub.name.endsWith('.assets');
+    });
+  } catch (_) {
+    return false;
+  }
+}
 
 // 只读取目录的直接子项（不递归），每个子项若是目录则标记 hasChildren
 async function getDirectoryChildren(dirPath) {
@@ -286,17 +305,7 @@ async function getDirectoryChildren(dirPath) {
       };
 
       if (isDir) {
-        // 快速检测该目录是否有可见子项（只列一层，不递归）
-        try {
-          const subEntries = await fs.promises.readdir(childPath, { withFileTypes: true });
-          const visibleSubEntries = subEntries.filter(sub => {
-            const subPath = path.join(childPath, sub.name);
-            return !isBlocked(subPath, sub.name, rules) && !sub.name.endsWith('.assets');
-          });
-          node.hasChildren = visibleSubEntries.length > 0;
-        } catch (_) {
-          node.hasChildren = false;
-        }
+        node.hasChildren = await hasVisibleChildren(childPath, rules);
         node.children = []; // 初始为空，展开时懒加载
       }
 
@@ -314,61 +323,4 @@ async function getDirectoryChildren(dirPath) {
     console.warn(`Cannot read directory ${dirPath}:`, error.message);
     return [];
   }
-}
-
-async function getDirectoryTree(dirPath) {
-  const stats = await fs.promises.stat(dirPath);
-  const name = path.basename(dirPath);
-  const rules = loadBlockRules();
-  
-  const node = {
-    name: name || dirPath,
-    path: dirPath,
-    type: stats.isDirectory() ? 'directory' : 'file',
-    size: stats.size,
-    lastModified: stats.mtime
-  };
-
-  if (stats.isDirectory()) {
-    try {
-      const children = await fs.promises.readdir(dirPath);
-      node.children = [];
-      
-      for (const child of children) {
-        const childPath = path.join(dirPath, child);
-        
-        // 检查是否被屏蔽
-        if (isBlocked(childPath, child, rules)) {
-          console.log(`Skipping blocked item: ${child}`);
-          continue;
-        }
-        
-        // 屏蔽 .assets 后缀的文件夹（保留原有逻辑）
-        if (child.endsWith('.assets')) {
-          console.log(`Skipping .assets folder: ${child}`);
-          continue;
-        }
-        
-        try {
-          const childNode = await getDirectoryTree(childPath);
-          node.children.push(childNode);
-        } catch (error) {
-          // Skip files that can't be accessed
-          console.warn(`Skipping ${childPath}:`, error.message);
-        }
-      }
-      
-      // Sort children: directories first, then files
-      node.children.sort((a, b) => {
-        if (a.type !== b.type) {
-          return a.type === 'directory' ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name);
-      });
-    } catch (error) {
-      console.warn(`Cannot read directory ${dirPath}:`, error.message);
-    }
-  }
-
-  return node;
 }

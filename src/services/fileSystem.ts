@@ -1,44 +1,38 @@
 import { FileNode } from '../types';
 
+type SearchResult = { name: string; path: string; type: string; dir: string };
+
+interface FileSystemApi {
+  openFile: (filePath: string) => Promise<boolean>;
+  openInExplorer: (pathToOpen: string) => Promise<boolean>;
+  getBlockRules: () => Promise<any>;
+  addBlockExtension: (extension: string) => Promise<boolean>;
+  addBlockPath: (filePath: string) => Promise<boolean>;
+  removeBlockExtension: (extension: string) => Promise<boolean>;
+  removeBlockPath: (filePath: string) => Promise<boolean>;
+  getDirectoryChildren: (dirPath: string) => Promise<FileNode[]>;
+  deletePath: (targetPath: string) => Promise<boolean>;
+  searchFiles: (request: { dirPath: string; keyword: string; generation: number }) => Promise<SearchResult[]>;
+  cancelSearch: (generation: number) => Promise<boolean>;
+}
+
 declare global {
   interface Window {
-    require: any;
+    fileSystemApi?: FileSystemApi;
   }
 }
 
 class FileSystemService {
-  private ipcRenderer: any;
-
-  constructor() {
-    if (window.require) {
-      const { ipcRenderer } = window.require('electron');
-      this.ipcRenderer = ipcRenderer;
-    }
-  }
-
-  async getDirectoryTree(dirPath: string): Promise<FileNode | null> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
-      return null;
-    }
-
-    try {
-      const tree = await this.ipcRenderer.invoke('get-directory-tree', dirPath);
-      return tree;
-    } catch (error) {
-      console.error('Error getting directory tree:', error);
-      return null;
-    }
-  }
+  private api = window.fileSystemApi;
 
   async openFile(filePath: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('open-file', filePath);
+      const result = await this.api.openFile(filePath);
       return result;
     } catch (error) {
       console.error('Error opening file:', error);
@@ -48,13 +42,13 @@ class FileSystemService {
 
   // 在系统文件浏览器中打开文件或文件夹
   async openInExplorer(pathToOpen: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('open-in-explorer', pathToOpen);
+      const result = await this.api.openInExplorer(pathToOpen);
       return result;
     } catch (error) {
       console.error('Error opening in explorer:', error);
@@ -64,13 +58,13 @@ class FileSystemService {
 
   // 获取屏蔽规则
   async getBlockRules(): Promise<any> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return { blockedExtensions: [], blockedPaths: [] };
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('get-block-rules');
+      const result = await this.api.getBlockRules();
       return result;
     } catch (error) {
       console.error('Error getting block rules:', error);
@@ -80,13 +74,13 @@ class FileSystemService {
 
   // 添加屏蔽扩展名
   async addBlockExtension(extension: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('add-block-extension', extension);
+      const result = await this.api.addBlockExtension(extension);
       return result;
     } catch (error) {
       console.error('Error adding block extension:', error);
@@ -96,13 +90,13 @@ class FileSystemService {
 
   // 添加屏蔽路径
   async addBlockPath(filePath: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('add-block-path', filePath);
+      const result = await this.api.addBlockPath(filePath);
       return result;
     } catch (error) {
       console.error('Error adding block path:', error);
@@ -112,13 +106,13 @@ class FileSystemService {
 
   // 移除屏蔽扩展名
   async removeBlockExtension(extension: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('remove-block-extension', extension);
+      const result = await this.api.removeBlockExtension(extension);
       return result;
     } catch (error) {
       console.error('Error removing block extension:', error);
@@ -128,13 +122,13 @@ class FileSystemService {
 
   // 移除屏蔽路径
   async removeBlockPath(filePath: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('remove-block-path', filePath);
+      const result = await this.api.removeBlockPath(filePath);
       return result;
     } catch (error) {
       console.error('Error removing block path:', error);
@@ -144,13 +138,13 @@ class FileSystemService {
 
   // 懒加载：只获取目录的直接子项（不递归）
   async getDirectoryChildren(dirPath: string): Promise<FileNode[]> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return [];
     }
 
     try {
-      const children = await this.ipcRenderer.invoke('get-directory-children', dirPath);
+      const children = await this.api.getDirectoryChildren(dirPath);
       return children ?? [];
     } catch (error) {
       console.error('Error getting directory children:', error);
@@ -160,13 +154,13 @@ class FileSystemService {
 
   // 删除文件或文件夹
   async deletePath(targetPath: string): Promise<boolean> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+    if (!this.api) {
+      console.error('File system API not available');
       return false;
     }
 
     try {
-      const result = await this.ipcRenderer.invoke('delete-path', targetPath);
+      const result = await this.api.deletePath(targetPath);
       return result;
     } catch (error) {
       console.error('Error deleting path:', error);
@@ -174,32 +168,34 @@ class FileSystemService {
     }
   }
 
-  // 获取常用目录路径
-  getCommonPaths(): string[] {
-    const os = window.require?.('os');
-    if (!os) return [];
-
-    return [
-      os.homedir(),
-      `${os.homedir()}\\Documents`,
-      `${os.homedir()}\\Desktop`,
-      `${os.homedir()}\\Downloads`,
-    ];
-  }
-
   // 搜索文件
-  async searchFiles(dirPath: string, keyword: string): Promise<Array<{name: string, path: string, type: string, dir: string}>> {
-    if (!this.ipcRenderer) {
-      console.error('Electron IPC not available');
+  async searchFiles(dirPath: string, keyword: string, generation: number): Promise<SearchResult[]> {
+    if (!this.api) {
+      console.error('File system API not available');
       return [];
     }
 
     try {
-      const results = await this.ipcRenderer.invoke('search-files', { dirPath, keyword });
+      const results = await this.api.searchFiles({ dirPath, keyword, generation });
       return results;
     } catch (error) {
       console.error('Error searching files:', error);
       return [];
+    }
+  }
+
+  async cancelSearch(generation: number): Promise<boolean> {
+    if (!this.api) {
+      console.error('File system API not available');
+      return false;
+    }
+
+    try {
+      const result = await this.api.cancelSearch(generation);
+      return result;
+    } catch (error) {
+      console.error('Error canceling search:', error);
+      return false;
     }
   }
 }

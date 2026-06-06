@@ -1,30 +1,33 @@
 @echo off
 echo =========================================
-echo MyNoteExplorer - 打包 Unpack 便携版本
+echo MyNoteExplorer - Build Portable Unpacked
 echo =========================================
 echo.
 
-echo 正在执行 npm run build:win ...
-echo (此过程包含关闭旧进程、清理缓存、编译 React 和打包)
+echo ==== packaging ====
+echo Running npm run build:win ...
+echo This will close old app processes, clean output, build React, and package Electron.
 echo.
 
-:: 切换到脚本所在目录（即项目根目录）
+:: Switch to the script directory, which is the project root.
 cd /d "%~dp0"
 
-:: 调用 npm 执行打包命令
+:: Run the package command.
 call npm run build:win
 
 echo.
 if %errorlevel% equ 0 (
     echo =========================================
-    echo 打包成功！
-    echo 请前往 release\win-unpacked 目录查看
+    echo Packaging succeeded.
+    echo Output: release\win-unpacked
     echo =========================================
 ) else (
     echo =========================================
-    echo 打包失败，请检查上方日志。
+    echo Packaging failed. Check the log above.
     echo =========================================
 )
 
+echo.
+echo finished
 echo.
 pause

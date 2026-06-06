@@ -5,6 +5,8 @@ import fileSystemService from './services/fileSystem';
 import { FileNode } from './types';
 import './App.css';
 
+const defaultMenuOrder = ['refresh', 'openInExplorer', 'copyPath', 'blockFile', 'blockExtension', 'deleteFile'];
+
 interface FavoriteItem {
   path: string;
   name?: string;
@@ -40,7 +42,6 @@ const App: React.FC = () => {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // 文件右键菜单拖拽排序状态
-  const defaultMenuOrder = ['refresh', 'openInExplorer', 'copyPath', 'blockFile', 'blockExtension', 'deleteFile'];
   const [menuOrder, setMenuOrder] = useState<string[]>(defaultMenuOrder);
   const [draggedMenuId, setDraggedMenuId] = useState<string | null>(null);
   const [dragOverMenuId, setDragOverMenuId] = useState<string | null>(null);
@@ -50,6 +51,7 @@ const App: React.FC = () => {
 
   // 用于竞态保护的请求 ID，防止旧的异步请求覆盖最新结果
   const loadIdRef = useRef(0);
+  const searchIdRef = useRef(0);
   const searchTimerRef = useRef<number | null>(null);
   const searchResultsRef = useRef<HTMLDivElement>(null);
 
@@ -455,16 +457,22 @@ const App: React.FC = () => {
       clearTimeout(searchTimerRef.current);
     }
 
+    const currentSearchId = searchIdRef.current + 1;
+    searchIdRef.current = currentSearchId;
+    void fileSystemService.cancelSearch(currentSearchId);
+
     if (!value.trim() || !currentPath) {
       setShowSearchResults(false);
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
     searchTimerRef.current = window.setTimeout(async () => {
       setIsSearching(true);
       setShowSearchResults(true);
-      const results = await fileSystemService.searchFiles(currentPath, value.trim());
+      const results = await fileSystemService.searchFiles(currentPath, value.trim(), currentSearchId);
+      if (currentSearchId !== searchIdRef.current) return;
       setSearchResults(results);
       setIsSearching(false);
     }, 300);
@@ -483,7 +491,10 @@ const App: React.FC = () => {
     }
     setIsSearching(true);
     setShowSearchResults(true);
-    const results = await fileSystemService.searchFiles(currentPath, searchQuery.trim());
+    const currentSearchId = searchIdRef.current + 1;
+    searchIdRef.current = currentSearchId;
+    const results = await fileSystemService.searchFiles(currentPath, searchQuery.trim(), currentSearchId);
+    if (currentSearchId !== searchIdRef.current) return;
     setSearchResults(results);
     setIsSearching(false);
   };
@@ -521,9 +532,12 @@ const App: React.FC = () => {
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
     }
+    searchIdRef.current += 1;
+    void fileSystemService.cancelSearch(searchIdRef.current);
     setSearchQuery('');
     setSearchResults([]);
     setShowSearchResults(false);
+    setIsSearching(false);
     setActivePath(null);
     setSelectedResultIndex(-1);
   };
@@ -613,7 +627,7 @@ const App: React.FC = () => {
         action = 'blockExtension'; 
         break;
       case 'deleteFile':
-        label = `🗑️ 删除${node.type === 'directory' ? '文件夹' : '文件'}`; action = 'deleteFile'; isDanger = true; break;
+        label = `🗑️ 移入回收站`; action = 'deleteFile'; isDanger = true; break;
       default: return null;
     }
 
@@ -696,7 +710,7 @@ const App: React.FC = () => {
                   </div>
                   {searchResults.map((result, idx) => (
                     <div
-                      key={idx}
+                      key={result.path}
                       className={`search-result-item ${idx === selectedResultIndex ? 'selected' : ''}`}
                       onClick={() => handleSearchResultClick(result.path)}
                       onMouseEnter={() => setSelectedResultIndex(idx)}
@@ -728,7 +742,7 @@ const App: React.FC = () => {
             ) : (
               favorites.map((fav, index) => (
                 <div
-                  key={index}
+                  key={fav.path}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
@@ -834,15 +848,14 @@ const App: React.FC = () => {
             onMouseUp={e => e.stopPropagation()} 
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="modal-title">确认删除</h3>
+            <h3 className="modal-title">移入回收站</h3>
             <p className="modal-body">
-              确定要删除 <strong>"{deleteTarget.name}"</strong> 吗？
-              {deleteTarget.type === 'directory' && ' 这将删除文件夹内所有内容。'}
-              <br />此操作不可撤销。
+              确定要将 <strong>"{deleteTarget.name}"</strong> 移入回收站吗？
+              {deleteTarget.type === 'directory' && ' 文件夹内所有内容也会一起移入回收站。'}
             </p>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)}>取消</button>
-              <button className="btn-danger" onClick={handleDeleteConfirm}>删除</button>
+              <button className="btn-danger" onClick={handleDeleteConfirm}>移入回收站</button>
             </div>
           </div>
         </div>
